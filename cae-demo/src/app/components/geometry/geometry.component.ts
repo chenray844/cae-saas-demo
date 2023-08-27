@@ -1,5 +1,6 @@
 import { Component, OnInit, OnDestroy, AfterViewInit } from '@angular/core';
 import { MenuItem } from 'primeng/api';
+import { fromEvent } from 'rxjs';
 declare var OccApp: any;
 
 @Component({
@@ -11,9 +12,23 @@ export class GeometryComponent implements OnInit, OnDestroy, AfterViewInit {
   dockItems: MenuItem[] | undefined;
   selectedFile: File | undefined;
   fileformat: string = '.stp,.step,.STP,.STEP';
+  OccViewer: any | undefined;
 
   constructor() {
     const self = this;
+
+    fromEvent(window, 'resize').subscribe(() => {
+      let sizeX = Math.min(window.innerWidth, window.screen.availWidth);
+      let sizeY = Math.min(window.innerHeight, window.screen.availHeight);
+
+      const canvas = <HTMLCanvasElement>document.getElementById('canvas');
+      canvas.style.width = `${sizeX}px`;
+      canvas.style.height = `${sizeY}px`;
+
+      let ratio = window.devicePixelRatio || 1;
+      canvas.width = sizeX * ratio;
+      canvas.height = sizeY * ratio;
+    });
   }
 
   ngOnInit(): void {
@@ -44,6 +59,14 @@ export class GeometryComponent implements OnInit, OnDestroy, AfterViewInit {
     const self = this;
 
     const canvas = document.createElement('canvas');
+    canvas.setAttribute('id', 'canvas');
+    canvas.setAttribute('class', 'canvas');
+    canvas.oncontextmenu = (event: any) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    canvas.tabIndex = -1;
+    canvas.onclick = () => { canvas.focus(); };
     const container = <HTMLDivElement>document.getElementById('occt_container');
     container.appendChild(canvas);
 
@@ -55,7 +78,14 @@ export class GeometryComponent implements OnInit, OnDestroy, AfterViewInit {
     };
 
     const runtime = await OccApp(config);
+    self.OccViewer = runtime;
     console.log('runtime : ', runtime);
+
+    setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+    }, 0);
+
+    canvas.focus();
   }
 
   private onOpenCAD(event: any): void {

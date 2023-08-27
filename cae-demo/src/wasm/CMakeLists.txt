@@ -10,6 +10,7 @@ find_package(freetype REQUIRED)
 find_package(OpenCASCADE REQUIRED)
 
 add_executable(${PROJECT_NAME}
+    src/viewer/WasmOcctView.cpp
     main.cpp
 )
 
@@ -22,13 +23,6 @@ target_include_directories(${PROJECT_NAME}
 target_link_directories(${PROJECT_NAME}
     PRIVATE
         ${OpenCASCADE_LIBRARY_DIR}
-)
-
-target_link_libraries(${PROJECT_NAME}
-    PRIVATE
-        ${OpenCASCADE_LIBS}
-        freetype 
-        spdlog::spdlog
 )
 
 set(OpenCASCADE_LIBS)
@@ -58,6 +52,15 @@ list(APPEND OpenCASCADE_LIBS
     TKCDF 
     TKernel
 )
+
+target_link_libraries(${PROJECT_NAME}
+    PRIVATE
+        ${OpenCASCADE_LIBS}
+        freetype 
+        spdlog::spdlog
+)
+
+
 
 
 set(emscripten_link_options)
