@@ -66,6 +66,11 @@ target_link_libraries(${PROJECT_NAME}
 set(emscripten_link_options)
 set(emscripten_compile_options)
 
+list(APPEND emscripten_compile_options
+    # "-pthread"
+    # "-sUSE_PTHREADS=1"
+)
+
 list(APPEND emscripten_link_options
     "-sWASM=1"
     "-sMODULARIZE=1"
@@ -74,13 +79,25 @@ list(APPEND emscripten_link_options
     "-sSINGLE_FILE=1"
     "-lembind"
     "-sUSE_ZLIB=1"
+    "-sINITIAL_MEMORY=512MB"
     "-sMAXIMUM_MEMORY=4GB"
-    # "-sEXPORTED_RUNTIME_METHODS=['ENV']"
-    "-s MAX_WEBGL_VERSION=2"
+    "-sEXPORTED_RUNTIME_METHODS=['ENV','ccall','cwrap']"
+    "-sMAX_WEBGL_VERSION=2"
+    "-sENVIRONMENT=web"
+    "-sFORCE_FILESYSTEM=1"
+    "-sEXPORTED_FUNCTIONS=['_malloc','_free','_main']"
+    "-sERROR_ON_UNDEFINED_SYMBOLS=1"
+    # "-sEXPORT_ALL=1"
+    #  undefined symbol: malloc. Required by _embind_register_std_string
+    # "-sMALLOC=none"
+    # not support pthread wasm-ld: error: --shared-memory is disallowed by OpenGl_Caps.cxx.o because it was not compiled with 'atomics' or 'bulk-memory' features.
+    # "-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency"
+    # "-sUSE_PTHREADS=1"
+    # "-sPROXY_TO_PTHREAD=1"
 )
 
 set(emscripten_debug_options)
-set(DEBUGINFO "PROFILE" CACHE STRING "Type of debug info")
+set(DEBUGINFO "NONE" CACHE STRING "Type of debug info")
 set_property(CACHE DEBUGINFO PROPERTY 
     STRINGS
         NONE 

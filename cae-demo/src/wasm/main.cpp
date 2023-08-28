@@ -32,6 +32,7 @@
 #include <Message_PrinterSystemLog.hxx>
 #include <OSD_MemInfo.hxx>
 #include <OSD_Parallel.hxx>
+#include <cstdlib>
 #include <iostream>
 
 #include "WasmOcctView.h"
