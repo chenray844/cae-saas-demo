@@ -51,7 +51,7 @@ def deploy(ctx):
     subprocess.run(cmd, cwd=wasmDir)
 
     ngDir = root/'cae-demo'
-    cmd = ['ng', 'build']
+    cmd = ['ng', 'build', '--base-href', '/cae-saas-demo/']
     logger.info(f'start building angular app : {cmd} at {ngDir}')
     subprocess.run(cmd, cwd=ngDir)
 
