@@ -100,9 +100,9 @@ class WasmOcctView : protected AIS_ViewController {
   static bool openFromString(const std::string& theName,
                              const std::string& buffer);
 
-  static bool openSTEPFromMemory(const std::string& theName,
-                                 uintptr_t theBuffer, int theDataLen,
-                                 bool theToFree);
+  static bool openSTEPAndIGESFromMemory(const std::string& theName,
+                                        uintptr_t theBuffer, int theDataLen,
+                                        bool theToFree);
 
  public:
   //! Default constructor.

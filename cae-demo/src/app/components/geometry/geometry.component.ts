@@ -11,7 +11,7 @@ declare var OccApp: any;
 export class GeometryComponent implements OnInit, OnDestroy, AfterViewInit {
   dockItems: MenuItem[] | undefined;
   selectedFile: File | undefined;
-  fileformat: string = '*.stp,*.step,*.STP,*.STEP,*.brep';
+  fileformat: string = '.brep';
   OccViewer: any | undefined;
   viewerCanvas: HTMLCanvasElement | undefined;
 

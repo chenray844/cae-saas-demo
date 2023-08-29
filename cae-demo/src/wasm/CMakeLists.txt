@@ -25,37 +25,9 @@ target_link_directories(${PROJECT_NAME}
         ${OpenCASCADE_LIBRARY_DIR}
 )
 
-set(OpenCASCADE_LIBS)
-list(APPEND OpenCASCADE_LIBS
-    TKRWMesh 
-    TKBinXCAF 
-    TKBin 
-    TKBinL 
-    TKOpenGles 
-    TKXCAF 
-    TKVCAF 
-    TKCAF 
-    TKV3d 
-    TKHLR 
-    TKMesh 
-    TKService 
-    TKShHealing 
-    TKPrim 
-    TKTopAlgo 
-    TKGeomAlgo 
-    TKBRep 
-    TKGeomBase 
-    TKG3d 
-    TKG2d 
-    TKMath 
-    TKLCAF 
-    TKCDF 
-    TKernel
-)
-
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
-        ${OpenCASCADE_LIBS}
+        ${OpenCASCADE_LIBRARIES}
         freetype 
         spdlog::spdlog
 )
@@ -79,7 +51,7 @@ list(APPEND emscripten_link_options
     "-sSINGLE_FILE=1"
     "-lembind"
     "-sUSE_ZLIB=1"
-    "-sINITIAL_MEMORY=512MB"
+    # "-sINITIAL_MEMORY=1GB"
     "-sMAXIMUM_MEMORY=4GB"
     "-sEXPORTED_RUNTIME_METHODS=['ENV','ccall','cwrap']"
     "-sMAX_WEBGL_VERSION=2"
@@ -97,7 +69,7 @@ list(APPEND emscripten_link_options
 )
 
 set(emscripten_debug_options)
-set(DEBUGINFO "NONE" CACHE STRING "Type of debug info")
+set(DEBUGINFO "DEBUG_NATIVE" CACHE STRING "Type of debug info")
 set_property(CACHE DEBUGINFO PROPERTY 
     STRINGS
         NONE 

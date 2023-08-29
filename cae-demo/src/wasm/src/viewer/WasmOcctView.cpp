@@ -24,25 +24,67 @@
 #include "WasmOcctView.h"
 
 #include <emscripten/bind.h>
+#include <spdlog/spdlog.h>
 
+// ===================== OCCT ======================
 #include <AIS_Shape.hxx>
 #include <AIS_ViewCube.hxx>
 #include <Aspect_DisplayConnection.hxx>
 #include <Aspect_Handle.hxx>
+#include <BRepAdaptor_Surface.hxx>
 #include <BRepBndLib.hxx>
+#include <BRepMesh_IncrementalMesh.hxx>
 #include <BRepTools.hxx>
 #include <BRep_Builder.hxx>
+#include <BRep_Tool.hxx>
 #include <Graphic3d_CubeMapPacked.hxx>
+#include <IGESCAFControl_Reader.hxx>
 #include <Image_AlienPixMap.hxx>
 #include <Message.hxx>
 #include <Message_Messenger.hxx>
+#include <Message_PrinterOStream.hxx>
+#include <Message_ProgressIndicator.hxx>
 #include <OpenGl_GraphicDriver.hxx>
+#include <Poly.hxx>
+#include <Poly_Triangulation.hxx>
 #include <Prs3d_DatumAspect.hxx>
 #include <Prs3d_ToolCylinder.hxx>
 #include <Prs3d_ToolDisk.hxx>
+#include <Quantity_Color.hxx>
+#include <STEPCAFControl_Reader.hxx>
+#include <STEPControl_Reader.hxx>
 #include <Standard_ArrayStreamBuffer.hxx>
+#include <Standard_PrimitiveTypes.hxx>
+#include <Standard_Version.hxx>
+#include <StepData_StepModel.hxx>
+#include <TColgp_Array1OfVec.hxx>
+#include <TDF_ChildIterator.hxx>
+#include <TDF_Label.hxx>
+#include <TDataStd_Name.hxx>
+#include <TDocStd_Document.hxx>
+#include <TopExp_Explorer.hxx>
+#include <TopTools_IndexedMapOfShape.hxx>
+#include <TopoDS.hxx>
+#include <TopoDS_Edge.hxx>
+#include <TopoDS_Solid.hxx>
 #include <Wasm_Window.hxx>
+#include <XCAFApp_Application.hxx>
+#include <XCAFDoc_ColorTool.hxx>
+#include <XCAFDoc_DocumentTool.hxx>
+#include <XCAFDoc_Location.hxx>
+#include <XCAFDoc_ShapeTool.hxx>
+
+// ==================== STD-CPP ======================
+#include <array>
+#include <climits>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <memory>
+#include <numeric>
+#include <sstream>
+#include <unordered_map>
+#include <vector>
 
 #define THE_CANVAS_ID "canvas"
 
@@ -765,7 +807,10 @@ void WasmOcctView::removeAllObjects() {
 // Purpose  :
 // ================================================================
 bool WasmOcctView::removeObject(const std::string& theName) {
+  spdlog::debug(__func__);
+
   WasmOcctView& aViewer = Instance();
+  spdlog::debug("objects : {}", aViewer.myObjects.Size());
   Handle(AIS_InteractiveObject) anObj;
   if (!theName.empty() &&
       !aViewer.myObjects.FindFromKey(theName.c_str(), anObj)) {
@@ -775,6 +820,7 @@ bool WasmOcctView::removeObject(const std::string& theName) {
   aViewer.Context()->Remove(anObj, false);
   aViewer.myObjects.RemoveKey(theName.c_str());
   aViewer.UpdateView();
+  spdlog::debug("{} done.", __func__);
   return true;
 }
 
@@ -832,11 +878,14 @@ void WasmOcctView::openFromUrl(const std::string& theName,
 bool WasmOcctView::openFromMemory(const std::string& theName,
                                   uintptr_t theBuffer, int theDataLen,
                                   bool theToFree) {
+  removeAllObjects();
   removeObject(theName);
   char* aBytes = reinterpret_cast<char*>(theBuffer);
   if (aBytes == nullptr || theDataLen <= 0) {
     return false;
   }
+
+  auto ext = std::filesystem::path(theName).extension();
 
 // Function to check if specified data stream starts with specified header.
 #define dataStartsWithHeader(theData, theHeader) \
@@ -846,8 +895,8 @@ bool WasmOcctView::openFromMemory(const std::string& theName,
     return openBRepFromMemory(theName, theBuffer, theDataLen, theToFree);
   } else if (dataStartsWithHeader(aBytes, "glTF")) {
     // return openGltfFromMemory (theName, theBuffer, theDataLen, theToFree);
-  } else if (dataStartsWithHeader(aBytes, "ISO-10303-21")) {
-    return openSTEPFromMemory(theName, theBuffer, theDataLen, theToFree);
+  } else if (dataStartsWithHeader(aBytes, "ISO-10303-21") | ext == ".iges") {
+    return openSTEPAndIGESFromMemory(theName, theBuffer, theDataLen, theToFree);
   }
   if (theToFree) {
     free(aBytes);
@@ -908,13 +957,109 @@ bool WasmOcctView::openFromString(const std::string& theName,
                         buffer.length(), false);
 }
 
-bool WasmOcctView::openSTEPFromMemory(const std::string& theName,
-                                      uintptr_t theBuffer, int theDataLen,
-                                      bool theToFree) {
+bool WasmOcctView::openSTEPAndIGESFromMemory(const std::string& theName,
+                                             uintptr_t theBuffer,
+                                             int theDataLen, bool theToFree) {
   Message::SendTrace() << "open step from memory : " << theName;
+  auto ext = std::filesystem::path(theName).extension();
+
   removeObject(theName);
 
   WasmOcctView& aViewer = Instance();
+  TopoDS_Shape aShape;
+  bool isLoaded = false;
+
+  {
+    char* aRawData = reinterpret_cast<char*>(theBuffer);
+    Standard_ArrayStreamBuffer aStreamBuffer(aRawData, theDataLen);
+    std::istream aStream(&aStreamBuffer);
+    std::filesystem::path wDir("/working");
+    std::filesystem::create_directories(wDir);
+    std::filesystem::path fpath = wDir.append(theName);
+
+    std::fstream fi{fpath, fi.binary | fi.out};
+    fi.write(aRawData, theDataLen);
+    fi.close();
+
+    {
+      Handle(TDocStd_Document) doc;
+      XCAFApp_Application::GetApplication()->NewDocument("MDTV-XCAF", doc);
+      bool canRead = false;
+      if (ext == ".step" || ext == ".stp") {
+        STEPCAFControl_Reader reader;
+        reader.SetColorMode(true);
+        reader.SetNameMode(true);
+        reader.SetLayerMode(true);
+        // reader.
+        if (reader.ReadFile(fpath.c_str()) == IFSelect_RetDone) {
+          canRead = true;
+          // Message_ProgressIndicator pi();
+          reader.Transfer(doc);
+        }
+      } else {
+        IGESCAFControl_Reader reader;
+        reader.SetColorMode(true);
+        reader.SetNameMode(true);
+        reader.SetLayerMode(true);
+        // reader.
+        if (reader.ReadFile(fpath.c_str()) == IFSelect_RetDone) {
+          canRead = true;
+          reader.Transfer(doc);
+        }
+      }
+
+      if (!canRead) {
+        Message::DefaultMessenger()->SendFail()
+            << "Failed opening file : " << theName;
+        return false;
+      }
+
+      Handle(XCAFDoc_ShapeTool) shapeTool =
+          XCAFDoc_DocumentTool::ShapeTool(doc->Main());
+      Handle(XCAFDoc_ColorTool) colorTool =
+          XCAFDoc_DocumentTool::ColorTool(doc->Main());
+      TDF_LabelSequence topLevelShapes;
+      shapeTool->GetShapes(topLevelShapes);
+      spdlog::debug("shapes : {}", topLevelShapes.Length());
+      for (Standard_Integer iLabel = 1; iLabel <= topLevelShapes.Length();
+           ++iLabel) {
+        TDF_Label label = topLevelShapes.Value(iLabel);
+        TopoDS_Shape shape;
+        shapeTool->GetShape(label, shape);
+        Handle(AIS_Shape) shapePrs = new AIS_Shape(shape);
+        if (!theName.empty()) {
+          aViewer.myObjects.Add(theName.c_str(), shapePrs);
+        }
+        shapePrs->SetMaterial(Graphic3d_NameOfMaterial_Silver);
+        aViewer.Context()->Display(shapePrs, AIS_Shaded, 0, false);
+        aViewer.View()->FitAll(0.01, false);
+        aViewer.UpdateView();
+      }
+
+      isLoaded = true;
+    }
+
+    if (theToFree) {
+      free(aRawData);
+    }
+  }
+
+  if (!isLoaded) {
+    return false;
+  }
+  // Handle(AIS_Shape) aShapePrs = new AIS_Shape(aShape);
+  // if (!theName.empty()) {
+  //   aViewer.myObjects.Add(theName.c_str(), aShapePrs);
+  // }
+  // aShapePrs->SetMaterial(Graphic3d_NameOfMaterial_Silver);
+  // aViewer.Context()->Display(aShapePrs, AIS_Shaded, 0, false);
+  aViewer.View()->FitAll(0.01, false);
+  aViewer.UpdateView();
+
+  Message::DefaultMessenger()->Send(
+      TCollection_AsciiString("Loaded file ") + theName.c_str(), Message_Info);
+  Message::DefaultMessenger()->Send(OSD_MemInfo::PrintInfo(), Message_Trace);
+
   return true;
 }
 
