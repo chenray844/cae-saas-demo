@@ -72,6 +72,10 @@ def deploy(ctx):
     logger.info(f'{cmd} at {root}')
     subprocess.run(cmd, cwd=root)
 
+    cmd = ['git', 'pull']
+    logger.info(f'{cmd} at {root}')
+    subprocess.run(cmd, cwd=root)
+
     cmd = ['git', 'push', 'origin', 'main']
     logger.info(f'{cmd} at {root}')
     subprocess.run(cmd, cwd=root)
