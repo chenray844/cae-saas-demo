@@ -69,7 +69,7 @@ list(APPEND emscripten_link_options
 )
 
 set(emscripten_debug_options)
-set(DEBUGINFO "DEBUG_NATIVE" CACHE STRING "Type of debug info")
+set(DEBUGINFO "NONE" CACHE STRING "Type of debug info")
 set_property(CACHE DEBUGINFO PROPERTY 
     STRINGS
         NONE 
