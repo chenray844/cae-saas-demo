@@ -55,7 +55,7 @@ def deploy(ctx):
     logger.info(f'start building angular app : {cmd} at {ngDir}')
     subprocess.run(cmd, cwd=ngDir)
 
-    publicDir = root/'docs'
+    publicDir = root/'public'
     if publicDir.exists():
         shutil.rmtree(publicDir)
     # publicDir.mkdir(parents=True, exist_ok=True)
