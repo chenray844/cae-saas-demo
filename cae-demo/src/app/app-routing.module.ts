@@ -7,7 +7,7 @@ import { GeometryComponent } from './components/geometry/geometry.component';
 
 const routes: Routes = [
   { title: 'CAE-Demo', path: '', pathMatch: 'full', redirectTo: 'geometry' },
-  { title: 'CAE-Geom Viewer [OCCT]', path: 'geometry', pathMatch: 'full', component: GeometryComponent },
+  { title: 'Viewer [OCCT]', path: 'geometry', pathMatch: 'full', component: GeometryComponent },
 ];
 
 @NgModule({
